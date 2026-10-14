@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Agenda de Médicos</title>
+<meta name="description" content="Agenda de bolsillo para visitadores médicos: médicos, visitas, notas y pendientes. Funciona sin internet.">
+<meta name="theme-color" content="#0b6b66">
+<link rel="icon" href="icon-192.png" type="image/png">
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: una columna tipo agenda de bolsillo; lista densa arriba, ficha del médico como hoja completa encima. */
+:root {
+  --paper: #eef2f1;
+  --card: #ffffff;
+  --ink: #15242a;
+  --muted: #5a6b71;
+  --line: #d7dfde;
+  --accent: #0b6b66;
+  --accent-ink: #ffffff;
+  --soft: #dcecea;
+  --warn: #a8500c;
+  --warn-soft: #fbecd9;
+  --bday: #a8355a;
+  --bday-soft: #f8e1e9;
+  --danger: #b3261e;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e1618; --card: #162124; --ink: #e4edeb; --muted: #93a6a7; --line: #263639;
+    --accent: #52bdb2; --accent-ink: #052220; --soft: #17332f; --warn: #f0a75a; --warn-soft: #3a2814;
+    --bday: #f28fae; --bday-soft: #3d1c28; --danger: #ff8a80; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e1618; --card: #162124; --ink: #e4edeb; --muted: #93a6a7; --line: #263639;
+  --accent: #52bdb2; --accent-ink: #052220; --soft: #17332f; --warn: #f0a75a; --warn-soft: #3a2814;
+  --bday: #f28fae; --bday-soft: #3d1c28; --danger: #ff8a80; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--paper); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 16px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 720px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Cabecera */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); border-bottom: 1px solid var(--line); }
+.top .wrap { padding-block: 12px 10px; display: grid; gap: 10px; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand h1 { margin: 0; font-family: var(--f-display); font-size: 1.45rem; letter-spacing: -0.01em; text-wrap: balance; }
+.brand h1 small { font-family: var(--f-body); font-weight: 400; font-size: 0.85rem; color: var(--muted); margin-left: 6px; }
+.brand-actions { display: flex; gap: 8px; }
+.search { position: relative; }
+.search input { width: 100%; padding: 12px 14px 12px 40px; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); font-size: 1rem; }
+.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); }
+.filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.filters::-webkit-scrollbar { display: none; }
+.filters select, .chip { flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 12px; font-size: 0.9rem; }
+.filters select { padding-right: 28px; max-width: 46vw; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+/* Botones */
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--r); padding: 9px 14px; font-weight: 700; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 6px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.danger { color: var(--danger); }
+.btn.sm { padding: 6px 10px; font-size: 0.85rem; }
+.btn[data-armed="1"] { background: var(--danger); color: var(--card); border-color: var(--danger); }
+
+/* Resumen */
+.summary { display: grid; gap: 8px; margin-block: 14px 6px; }
+.alert { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--r); font-size: 0.92rem; }
+.alert.bday { background: var(--bday-soft); }
+.alert.pend { background: var(--warn-soft); }
+.alert strong { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.alert.bday strong { color: var(--bday); }
+.alert.pend strong { color: var(--warn); }
+.linkish { background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 3px; text-align: left; }
+.demo-note { font-size: 0.85rem; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* Lista */
+.count { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 14px 0 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.count select { border: 0; background: transparent; color: var(--muted); font-size: 0.8rem; text-transform: none; letter-spacing: 0; }
+.list { list-style: none; margin: 0 0 120px; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.list li + li { border-top: 1px solid var(--line); }
+.row { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 14px; background: none; border: 0; text-align: left; }
+.row:active { background: var(--soft); }
+.row-main { min-width: 0; }
+.row-name { font-weight: 700; font-size: 1.02rem; }
+.row-sub, .row-addr { color: var(--muted); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.mat { font-family: var(--f-mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.badges { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.row-badges { grid-column: 1 / -1; justify-content: flex-start; margin-top: 4px; }
+.pill { font-size: 0.74rem; padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill.old { background: var(--warn-soft); color: var(--warn); }
+.pill.bday { background: var(--bday-soft); color: var(--bday); }
+.pill.pend { background: var(--warn-soft); color: var(--warn); }
+.pill.demo { background: transparent; border: 1px dashed var(--line); color: var(--muted); }
+.empty { padding: 28px 16px; text-align: center; color: var(--muted); }
+
+.fab { position: fixed; right: max(16px, calc(env(safe-area-inset-right, 0px) + 16px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); z-index: 6; box-shadow: 0 6px 18px rgba(0,0,0,.18); border-radius: 999px; padding: 13px 20px; }
+
+/* Hojas (ficha, editor, respaldo) */
+.sheet { position: fixed; inset: 0; z-index: 20; background: var(--paper); overflow-y: auto; -webkit-overflow-scrolling: touch; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.sheet .bar { position: sticky; top: 0; z-index: 2; background: var(--paper); border-bottom: 1px solid var(--line); }
+.sheet .bar .wrap { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block: 8px; }
+.sheet-body { padding-block: 16px 60px; display: grid; gap: 18px; }
+.eyebrow { margin: 0; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.eyebrow .mat { font-size: 0.8rem; letter-spacing: 0; text-transform: none; }
+.det-name { margin: 2px 0 8px; font-family: var(--f-display); font-size: 1.75rem; line-height: 1.15; text-wrap: balance; }
+.block { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.block h3 { margin: 0; font-size: 0.78rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
+dl.datos { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; }
+dl.datos dt { color: var(--muted); font-size: 0.88rem; }
+dl.datos dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+dl.datos a { color: var(--accent); }
+.comment { white-space: pre-wrap; margin: 0; }
+
+/* Anotador */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { border: 0; background: var(--card); padding: 7px 14px; font-weight: 700; font-size: 0.9rem; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.composer-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+textarea, .field input, .field select { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: 10px 12px; font-size: 1rem; }
+textarea { min-height: 80px; resize: vertical; }
+input[type="date"] { border: 1px solid var(--line); border-radius: 8px; background: var(--card); padding: 7px 10px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 0.92rem; }
+.check input { width: 20px; height: 20px; accent-color: var(--warn); }
+
+/* Historial */
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.timeline li { display: grid; grid-template-columns: 92px 1fr auto; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); align-items: start; }
+.timeline li:first-child { border-top: 0; }
+.t-date { font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.t-kind { display: block; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 700; }
+.t-kind.visita { color: var(--accent); }
+.t-kind.nota { color: var(--muted); }
+.t-text { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.t-text.done { text-decoration: line-through; color: var(--muted); }
+.t-actions { display: flex; gap: 2px; align-items: center; }
+.icon-btn { border: 0; background: none; padding: 6px; border-radius: 6px; color: var(--muted); font-size: 0.82rem; }
+.icon-btn[data-armed="1"] { color: var(--danger); font-weight: 700; }
+.pend-item { display: flex; gap: 10px; align-items: flex-start; }
+.pend-item input { margin-top: 3px; width: 20px; height: 20px; accent-color: var(--accent); flex: 0 0 auto; }
+.pend-item small { color: var(--muted); display: block; font-size: 0.8rem; }
+
+/* Formulario */
+.form { display: grid; gap: 14px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label, .field .lbl { font-size: 0.85rem; color: var(--muted); font-weight: 700; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 420px) { .two { grid-template-columns: 1fr; } }
+.hint { font-size: 0.85rem; color: var(--muted); margin: 0; }
+code { font-family: var(--f-mono); font-size: 0.82rem; background: var(--soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 10px 16px; border-radius: 999px; z-index: 50; font-size: 0.92rem; max-width: calc(100vw - 32px); text-align: center; }
+@media (prefers-reduced-motion: no-preference) { .sheet:not([hidden]) { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateY(14px); opacity: .6; } } }
+</style>
+
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Mis médicos <small id="total"></small></h1>
+      <div class="brand-actions">
+        <button class="btn sm" data-act="respaldo" type="button">Respaldo</button>
+      </div>
+    </div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <input id="q" type="search" placeholder="Buscar nombre, matrícula, calle…" autocomplete="off" aria-label="Buscar">
+    </div>
+    <div class="filters" role="group" aria-label="Filtros">
+      <select id="f-esp" aria-label="Especialidad"></select>
+      <select id="f-ciudad" aria-label="Ciudad"></select>
+      <button class="chip" type="button" data-flag="pend" aria-pressed="false">Con pendientes</button>
+      <button class="chip" type="button" data-flag="sinver" aria-pressed="false">Sin visitar +30 días</button>
+      <button class="chip" type="button" data-flag="cumple" aria-pressed="false">Cumple este mes</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="summary" class="summary"></div>
+  <div class="count"><span id="count"></span>
+    <select id="orden" aria-label="Ordenar">
+      <option value="nombre">Ordenar por nombre</option>
+      <option value="visita">Hace más que no lo veo</option>
+      <option value="ciudad">Por ciudad</option>
+    </select>
+  </div>
+  <ul id="list" class="list"></ul>
+</main>
+
+<button class="btn primary fab" type="button" data-act="nuevo">+ Médico</button>
+
+<section id="detalle" class="sheet" hidden aria-label="Ficha del médico"></section>
+<section id="editor" class="sheet" hidden aria-label="Editar médico"></section>
+<section id="ajustes" class="sheet" hidden aria-label="Respaldo"></section>
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+  var KEY = "agenda-medicos-v1";
+  var MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  var MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  var CAMPOS = ["nombre", "especialidad", "matricula", "telefono", "email", "direccion", "ciudad", "horarios", "cumple", "comentario"];
+
+  /* ---------- utilidades ---------- */
+  function $(s, r) { return (r || document).querySelector(s); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function norm(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim(); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function iso(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function hoy() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+  function hoyISO() { return iso(hoy()); }
+  function parseISO(s) { var p = String(s).split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function haceDias(n) { var d = hoy(); d.setDate(d.getDate() - n); return iso(d); }
+  function diasDesde(s) { return Math.round((hoy() - parseISO(s)) / 864e5); }
+  function fmtFecha(s) { var d = parseISO(s); return d.getDate() + " " + MESES[d.getMonth()] + " " + d.getFullYear(); }
+  function fmtCumple(mmdd) { if (!mmdd) return ""; var p = mmdd.split("-"); return (+p[1]) + " de " + MESES_L[+p[0] - 1]; }
+  function cumpleEn(n) { var d = hoy(); d.setDate(d.getDate() + n); return pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function diasACumple(mmdd) {
+    if (!mmdd) return null;
+    var p = mmdd.split("-"), h = hoy();
+    var d = new Date(h.getFullYear(), +p[0] - 1, +p[1]);
+    if (d < h) d = new Date(h.getFullYear() + 1, +p[0] - 1, +p[1]);
+    return Math.round((d - h) / 864e5);
+  }
+  function hace(n) { if (n <= 0) return "hoy"; if (n === 1) return "ayer"; if (n < 60) return "hace " + n + " d"; return "hace " + Math.round(n / 30) + " meses"; }
+
+  /* ---------- datos ---------- */
+  function ejemplos() {
+    function m(o) { o.id = uid(); o.ejemplo = true; o.notas = (o.notas || []).map(function (n) { n.id = uid(); return n; }); return o; }
+    return [
+      m({ nombre: "Dra. María Laura Benítez", especialidad: "Cardiología", matricula: "MP 14872", telefono: "341 555-0142", email: "", direccion: "Bv. Oroño 1340, 2° B", ciudad: "Rosario", horarios: "Lunes y miércoles de 14 a 19 h", cumple: cumpleEn(5), comentario: "Atiende por orden de llegada. Conviene llegar antes de las 15.",
+        notas: [{ tipo: "visita", fecha: haceDias(9), texto: "Le dejé muestras del antihipertensivo nuevo. Pidió folletos para pacientes.", pendiente: false },
+                { tipo: "nota", fecha: haceDias(9), texto: "Llevarle 2 cajas de muestras de losartán 50 mg.", pendiente: true, hecho: false }] }),
+      m({ nombre: "Dr. Gustavo Ferraro", especialidad: "Clínica médica", matricula: "MP 9921", telefono: "341 555-0187", direccion: "Hipólito Yrigoyen 2050", ciudad: "Funes", horarios: "Martes y jueves de 9 a 13 h", cumple: cumpleEn(73), comentario: "Prefiere que lo visiten después de las 12.",
+        notas: [{ tipo: "visita", fecha: haceDias(41), texto: "Charla corta, estaba con mucha gente.", pendiente: false }] }),
+      m({ nombre: "Dra. Paula Sosa", especialidad: "Pediatría", matricula: "MP 17330", telefono: "", direccion: "Pellegrini 2950, consultorio 4", ciudad: "Rosario", horarios: "Lunes a viernes de 8 a 12 h", cumple: cumpleEn(160), comentario: "",
+        notas: [{ tipo: "visita", fecha: haceDias(3), texto: "Arreglé por teléfono: va a recetar el jarabe para la tos este invierno.", pendiente: false }] }),
+      m({ nombre: "Dr. Hernán Quiroga", especialidad: "Traumatología", matricula: "MP 11207", telefono: "341 555-0110", direccion: "San Martín 845", ciudad: "Villa Gobernador Gálvez", horarios: "Viernes de 16 a 20 h", cumple: cumpleEn(24), comentario: "Todavía no lo visité. Me lo pasó la Dra. Sosa.", notas: [] }),
+      m({ nombre: "Dra. Silvina Acosta", especialidad: "Ginecología", matricula: "MP 15560", telefono: "3464 55-0133", direccion: "Buenos Aires 1720", ciudad: "Casilda", horarios: "Jueves de 15 a 20 h", cumple: cumpleEn(210), comentario: "",
+        notas: [{ tipo: "visita", fecha: haceDias(20), texto: "Buena recepción. Receta bastante el ácido fólico.", pendiente: false },
+                { tipo: "nota", fecha: haceDias(20), texto: "Me pidió muestras de ácido fólico para la próxima.", pendiente: true, hecho: false }] }),
+      m({ nombre: "Dr. Martín Ledesma", especialidad: "Cardiología", matricula: "MP 12094", telefono: "341 555-0199", direccion: "Mendoza 3120", ciudad: "Rosario", horarios: "Martes de 10 a 14 h", cumple: cumpleEn(300), comentario: "",
+        notas: [{ tipo: "visita", fecha: haceDias(62), texto: "Me dijo que vuelva en dos meses.", pendiente: false }] })
+    ];
+  }
+
+  var db, guardaOk = true;
+  try { var raw = localStorage.getItem(KEY); if (raw) db = JSON.parse(raw); } catch (e) { db = null; }
+  if (!db || !Array.isArray(db.medicos)) { db = { medicos: ejemplos() }; guardar(true); }
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+
+  function guardar(silencio) {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); guardaOk = true; }
+    catch (e) { guardaOk = false; if (!silencio) toast("No se pudo guardar en este teléfono. Hacé un respaldo."); }
+  }
+  function buscar(id) { for (var i = 0; i < db.medicos.length; i++) if (db.medicos[i].id === id) return db.medicos[i]; return null; }
+  function ultimaVisita(m) { var u = null; (m.notas || []).forEach(function (n) { if (n.tipo === "visita" && (!u || n.fecha > u)) u = n.fecha; }); return u; }
+  function pendientes(m) { return (m.notas || []).filter(function (n) { return n.pendiente && !n.hecho; }); }
+
+  /* ---------- estado de la lista ---------- */
+  var st = { q: "", esp: "", ciudad: "", flag: "", orden: "nombre" };
+  try { var o = localStorage.getItem(KEY + ":orden"); if (o) st.orden = o; } catch (e) {}
+  $("#orden").value = st.orden;
+
+  function opciones(campo) {
+    var set = {};
+    db.medicos.forEach(function (m) { var v = (m[campo] || "").trim(); if (v) set[norm(v)] = set[norm(v)] || v; });
+    return Object.keys(set).map(function (k) { return set[k]; }).sort(function (a, b) { return a.localeCompare(b, "es"); });
+  }
+  function llenarSelect(sel, campo, todos) {
+    var vals = opciones(campo), actual = st[sel.id === "f-esp" ? "esp" : "ciudad"];
+    sel.innerHTML = '<option value="">' + todos + "</option>" + vals.map(function (v) { return '<option value="' + esc(v) + '">' + esc(v) + "</option>"; }).join("");
+    sel.value = vals.indexOf(actual) >= 0 ? actual : "";
+    if (sel.value !== actual) { if (sel.id === "f-esp") st.esp = ""; else st.ciudad = ""; }
+  }
+
+  function filtrados() {
+    var q = norm(st.q), mesActual = pad(hoy().getMonth() + 1);
+    var lista = db.medicos.filter(function (m) {
+      if (st.esp && norm(m.especialidad) !== norm(st.esp)) return false;
+      if (st.ciudad && norm(m.ciudad) !== norm(st.ciudad)) return false;
+      if (st.flag === "pend" && !pendientes(m).length) return false;
+      if (st.flag === "cumple" && !(m.cumple && m.cumple.slice(0, 2) === mesActual)) return false;
+      if (st.flag === "sinver") { var u = ultimaVisita(m); if (u && diasDesde(u) <= 30) return false; }
+      if (q) {
+        var txt = norm([m.nombre, m.matricula, m.especialidad, m.direccion, m.ciudad, m.telefono, m.comentario].join(" "));
+        var ok = q.split(/\s+/).every(function (p) { return txt.indexOf(p) >= 0; });
+        if (!ok) return false;
+      }
+      return true;
+    });
+    function sinTitulo(n) { return norm(n).replace(/^(dra?\.?|doctora?)\s+/, ""); }
+    lista.sort(function (a, b) {
+      if (st.orden === "visita") {
+        var ua = ultimaVisita(a) || "0000", ub = ultimaVisita(b) || "0000";
+        if (ua !== ub) return ua < ub ? -1 : 1;
+      } else if (st.orden === "ciudad") {
+        var c = norm(a.ciudad).localeCompare(norm(b.ciudad), "es");
+        if (c) return c;
+      }
+      return sinTitulo(a.nombre).localeCompare(sinTitulo(b.nombre), "es");
+    });
+    return lista;
+  }
+
+  function renderLista() {
+    llenarSelect($("#f-esp"), "especialidad", "Todas las especialidades");
+    llenarSelect($("#f-ciudad"), "ciudad", "Todas las ciudades");
+    document.querySelectorAll(".chip[data-flag]").forEach(function (b) { b.setAttribute("aria-pressed", String(b.dataset.flag === st.flag)); });
+    $("#total").textContent = db.medicos.length ? "(" + db.medicos.length + ")" : "";
+
+    // Resumen: cumpleaños próximos y pendientes
+    var cumples = db.medicos.map(function (m) { return { m: m, d: diasACumple(m.cumple) }; })
+      .filter(function (x) { return x.d !== null && x.d <= 14; }).sort(function (a, b) { return a.d - b.d; });
+    var totPend = 0, conPend = 0;
+    db.medicos.forEach(function (m) { var p = pendientes(m).length; totPend += p; if (p) conPend++; });
+    var h = "";
+    if (cumples.length) {
+      h += '<div class="alert bday"><strong>Cumpleaños</strong>' + cumples.map(function (x) {
+        return '<button class="linkish" type="button" data-open="' + x.m.id + '">' + esc(x.m.nombre) + "</button> " + (x.d === 0 ? "¡hoy!" : x.d === 1 ? "mañana" : "en " + x.d + " días");
+      }).join(" · ") + "</div>";
+    }
+    if (totPend) {
+      h += '<div class="alert pend"><strong>Pendientes</strong><button class="linkish" type="button" data-flag="pend">' + totPend + (totPend === 1 ? " cosa pendiente" : " cosas pendientes") + " con " + conPend + (conPend === 1 ? " médico" : " médicos") + "</button></div>";
+    }
+    var nEj = db.medicos.filter(function (m) { return m.ejemplo; }).length;
+    if (nEj) h += '<div class="demo-note">Los médicos marcados como <span class="pill demo">ejemplo</span> son de muestra. <button class="btn sm" type="button" data-act="borrar-ejemplos">Borrar ejemplos</button></div>';
+    if (!guardaOk) h += '<div class="alert pend"><strong>Atención</strong>Este navegador no está guardando los cambios. Exportá un respaldo antes de cerrar.</div>';
+    $("#summary").innerHTML = h;
+
+    var lista = filtrados();
+    $("#count").textContent = lista.length === db.medicos.length ? lista.length + (lista.length === 1 ? " médico" : " médicos") : lista.length + " de " + db.medicos.length;
+    if (!db.medicos.length) {
+      $("#list").innerHTML = '<li class="empty">Todavía no cargaste médicos.<br>Tocá <b>+ Médico</b> para agregar el primero, o cargá tu lista desde Excel en <b>Respaldo</b>.</li>';
+      return;
+    }
+    if (!lista.length) { $("#list").innerHTML = '<li class="empty">Ningún médico coincide con la búsqueda o los filtros.</li>'; return; }
+    $("#list").innerHTML = lista.map(function (m) {
+      var u = ultimaVisita(m), p = pendientes(m).length, dc = diasACumple(m.cumple), b = "";
+      if (dc !== null && dc <= 14) b += '<span class="pill bday">cumple ' + (dc === 0 ? "hoy" : "en " + dc + " d") + "</span>";
+      if (p) b += '<span class="pill pend">' + p + " pend.</span>";
+      b += u ? '<span class="pill' + (diasDesde(u) > 30 ? " old" : "") + '">' + hace(diasDesde(u)) + "</span>" : '<span class="pill old">sin visitas</span>';
+      if (m.ejemplo) b += '<span class="pill demo">ejemplo</span>';
+      return '<li><button class="row" type="button" data-open="' + m.id + '">' +
+        '<div class="row-main"><div class="row-name">' + esc(m.nombre) + '</div>' +
+        '<div class="row-sub">' + esc([m.especialidad, m.ciudad].filter(Boolean).join(" · ")) + "</div>" +
+        (m.direccion ? '<div class="row-addr">' + esc(m.direccion) + "</div>" : "") + "</div>" +
+        '<div class="row-side">' + (m.matricula ? '<span class="mat">' + esc(m.matricula) + "</span>" : "") + "</div>" +
+        '<div class="badges row-badges">' + b + "</div>" +
+        "</button></li>";
+    }).join("");
+  }
+
+  /* ---------- hojas y botón atrás ---------- */
+  var pila = [], usaHist = false;
+  function abrir(id) {
+    var el = document.getElementById(id);
+    el.hidden = false; el.scrollTop = 0;
+    if (pila.indexOf(id) < 0) {
+      pila.push(id);
+      try { history.pushState({ hoja: id }, ""); usaHist = true; } catch (e) { usaHist = false; }
+    }
+    document.body.style.overflow = "hidden";
+  }
+  function ocultarTope() {
+    var id = pila.pop(); if (id) document.getElementById(id).hidden = true;
+    if (!pila.length) { document.body.style.overflow = ""; renderLista(); }
+  }
+  function cerrar() { if (usaHist) { try { history.back(); return; } catch (e) {} } ocultarTope(); }
+  window.addEventListener("popstate", function () { if (pila.length) ocultarTope(); });
+
+  /* ---------- ficha ---------- */
+  var actual = null, composer = { tipo: "visita" };
+  function renderDetalle() {
+    var m = buscar(actual); if (!m) { $("#detalle").innerHTML = ""; return; }
+    var u = ultimaVisita(m), dc = diasACumple(m.cumple), pend = pendientes(m);
+    var notas = (m.notas || []).slice().sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; });
+    var mapa = m.direccion ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(m.direccion + ", " + (m.ciudad || "")) : "";
+    var tel = (m.telefono || "").replace(/[^\d+]/g, "");
+    var datos = [
+      ["Matrícula", m.matricula ? '<span class="mat" style="font-size:.95rem;color:var(--ink)">' + esc(m.matricula) + "</span>" : ""],
+      ["Dirección", m.direccion ? esc(m.direccion) + (mapa ? ' · <a href="' + mapa + '" target="_blank" rel="noopener">mapa</a>' : "") : ""],
+      ["Ciudad", esc(m.ciudad)],
+      ["Atiende", esc(m.horarios)],
+      ["Teléfono", m.telefono ? esc(m.telefono) + (tel ? ' · <a href="tel:' + esc(tel) + '">llamar</a> · <a href="https://wa.me/' + esc(tel.replace(/^\+?/, "").replace(/^0/, "54")) + '" target="_blank" rel="noopener">WhatsApp</a>' : "") : ""],
+      ["Email", m.email ? esc(m.email) : ""],
+      ["Cumpleaños", m.cumple ? fmtCumple(m.cumple) + (dc === 0 ? " · ¡hoy!" : dc <= 30 ? " · faltan " + dc + " días" : "") : ""]
+    ].filter(function (x) { return x[1]; });
+
+    $("#detalle").innerHTML =
+      '<div class="bar"><div class="wrap"><button class="btn ghost" type="button" data-act="cerrar">← Médicos</button>' +
+      '<button class="btn sm" type="button" data-act="editar">Editar datos</button></div></div>' +
+      '<div class="wrap sheet-body">' +
+        "<div>" +
+          '<p class="eyebrow">' + esc(m.especialidad || "Sin especialidad") + (m.ejemplo ? ' · <span class="pill demo">ejemplo</span>' : "") + "</p>" +
+          '<h2 class="det-name">' + esc(m.nombre) + "</h2>" +
+          '<div class="badges" style="justify-content:flex-start">' +
+            (u ? '<span class="pill' + (diasDesde(u) > 30 ? " old" : "") + '">Última visita: ' + fmtFecha(u) + " (" + hace(diasDesde(u)) + ")</span>" : '<span class="pill old">Todavía sin visitas</span>') +
+            (dc !== null && dc <= 14 ? '<span class="pill bday">Cumple ' + (dc === 0 ? "hoy" : "en " + dc + " días") + "</span>" : "") +
+          "</div>" +
+        "</div>" +
+
+        '<div class="block">' +
+          '<div class="composer-row"><div class="seg" role="group" aria-label="Tipo de anotación">' +
+            '<button type="button" data-tipo="visita" aria-pressed="' + (composer.tipo === "visita") + '">Visita</button>' +
+            '<button type="button" data-tipo="nota" aria-pressed="' + (composer.tipo === "nota") + '">Nota</button></div>' +
+            '<input type="date" id="c-fecha" value="' + hoyISO() + '" max="' + hoyISO() + '" aria-label="Fecha"></div>' +
+          '<textarea id="c-texto" placeholder="' + (composer.tipo === "visita" ? "¿Cómo te fue? (opcional)" : "Ej: me pidió muestras de…, va a recetar…, llamarlo el lunes") + '"></textarea>' +
+          '<div class="composer-row"><label class="check"><input type="checkbox" id="c-pend"' + (composer.tipo === "nota" ? " checked" : "") + '> Es un pendiente</label>' +
+          '<button class="btn primary" type="button" data-act="anotar">' + (composer.tipo === "visita" ? "Registrar visita" : "Guardar nota") + "</button></div>" +
+        "</div>" +
+
+        (pend.length ? '<div class="block"><h3>Pendientes (' + pend.length + ")</h3>" + pend.map(function (n) {
+          return '<label class="pend-item"><input type="checkbox" data-hecho="' + n.id + '"><span>' + esc(n.texto) + "<small>Anotado el " + fmtFecha(n.fecha) + "</small></span></label>";
+        }).join("") + '<p class="hint">Tildalo cuando lo resuelvas. Queda en el historial.</p></div>' : "") +
+
+        '<div class="block"><h3>Datos</h3>' + (datos.length ? '<dl class="datos">' + datos.map(function (d) { return "<dt>" + d[0] + "</dt><dd>" + d[1] + "</dd>"; }).join("") + "</dl>" : '<p class="hint">Sin datos cargados. Tocá <b>Editar datos</b>.</p>') +
+          (m.comentario ? '<h3 style="margin-top:6px">Comentario</h3><p class="comment">' + esc(m.comentario) + "</p>" : "") +
+        "</div>" +
+
+        '<div class="block"><h3>Historial</h3>' + (notas.length ? '<ul class="timeline">' + notas.map(function (n) {
+          var kind = n.tipo === "visita" ? "Visita" : n.pendiente ? (n.hecho ? "Resuelto" : "Pendiente") : "Nota";
+          return "<li><div class=\"t-date\">" + fmtFecha(n.fecha) + '<span class="t-kind ' + n.tipo + '">' + kind + "</span></div>" +
+            '<div class="t-text' + (n.pendiente && n.hecho ? " done" : "") + '">' + (n.texto ? esc(n.texto) : '<span style="color:var(--muted)">(sin comentario)</span>') + "</div>" +
+            '<div class="t-actions">' + (n.pendiente ? '<button class="icon-btn" type="button" data-toggle="' + n.id + '">' + (n.hecho ? "reabrir" : "listo") + "</button>" : "") +
+            '<button class="icon-btn" type="button" data-borrar-nota="' + n.id + '" aria-label="Borrar anotación">borrar</button></div></li>';
+        }).join("") + "</ul>" : '<p class="hint">Acá van a aparecer tus visitas y notas.</p>') + "</div>" +
+      "</div>";
+  }
+
+  function anotar() {
+    var m = buscar(actual); if (!m) return;
+    var texto = $("#c-texto").value.trim(), fecha = $("#c-fecha").value || hoyISO(), pend = $("#c-pend").checked;
+    if (composer.tipo === "nota" && !texto) { toast("Escribí la nota antes de guardar."); $("#c-texto").focus(); return; }
+    if (pend && !texto) { toast("Escribí qué quedó pendiente."); $("#c-texto").focus(); return; }
+    m.notas = m.notas || [];
+    m.notas.push({ id: uid(), tipo: composer.tipo, fecha: fecha, texto: texto, pendiente: pend, hecho: false });
+    guardar(); renderDetalle();
+    toast(composer.tipo === "visita" ? "Visita registrada" : "Nota guardada");
+  }
+
+  /* ---------- editor ---------- */
+  var editando = null;
+  function renderEditor() {
+    var m = editando ? buscar(editando) : {}, c = (m && m.cumple) ? m.cumple.split("-") : ["", ""];
+    function campo(id, label, val, extra) { return '<div class="field"><label for="e-' + id + '">' + label + '</label><input id="e-' + id + '" value="' + esc(val || "") + '" ' + (extra || "") + "></div>"; }
+    var dias = '<option value="">Día</option>'; for (var i = 1; i <= 31; i++) dias += '<option value="' + pad(i) + '"' + (c[1] === pad(i) ? " selected" : "") + ">" + i + "</option>";
+    var meses = '<option value="">Mes</option>' + MESES_L.map(function (n, i) { return '<option value="' + pad(i + 1) + '"' + (c[0] === pad(i + 1) ? " selected" : "") + ">" + n + "</option>"; }).join("");
+    $("#editor").innerHTML =
+      '<div class="bar"><div class="wrap"><button class="btn ghost" type="button" data-act="cerrar">Cancelar</button>' +
+      '<button class="btn primary" type="button" data-act="guardar-medico">Guardar</button></div></div>' +
+      '<form class="wrap sheet-body form" id="form-medico" autocomplete="off">' +
+        '<h2 class="det-name" style="margin:0">' + (editando ? "Editar médico" : "Nuevo médico") + "</h2>" +
+        campo("nombre", "Nombre completo *", m.nombre, 'placeholder="Ej: Dra. Ana Pérez" required') +
+        '<div class="two">' + campo("especialidad", "Especialidad", m.especialidad, 'list="dl-esp"') + campo("matricula", "Matrícula", m.matricula, 'placeholder="MP 12345"') + "</div>" +
+        '<div class="two">' + campo("direccion", "Dirección donde atiende", m.direccion) + campo("ciudad", "Ciudad", m.ciudad, 'list="dl-ciudad"') + "</div>" +
+        campo("horarios", "Días y horarios", m.horarios, 'placeholder="Ej: Lunes y miércoles de 14 a 19 h"') +
+        '<div class="two">' + campo("telefono", "Teléfono", m.telefono, 'inputmode="tel"') + campo("email", "Email", m.email, 'inputmode="email"') + "</div>" +
+        '<div class="field"><span class="lbl">Cumpleaños</span><div class="two" style="grid-template-columns:1fr 2fr"><select id="e-cdia" aria-label="Día">' + dias + '</select><select id="e-cmes" aria-label="Mes">' + meses + "</select></div></div>" +
+        '<div class="field"><label for="e-comentario">Comentario fijo</label><textarea id="e-comentario" placeholder="Lo que siempre conviene recordar de este médico">' + esc(m.comentario || "") + "</textarea></div>" +
+        '<datalist id="dl-esp">' + opciones("especialidad").map(function (v) { return '<option value="' + esc(v) + '">'; }).join("") + "</datalist>" +
+        '<datalist id="dl-ciudad">' + opciones("ciudad").map(function (v) { return '<option value="' + esc(v) + '">'; }).join("") + "</datalist>" +
+        '<div class="actions"><button class="btn primary" type="submit">Guardar</button>' +
+        (editando ? '<button class="btn danger" type="button" data-act="borrar-medico">Borrar médico</button>' : "") + "</div>" +
+      "</form>";
+  }
+  function guardarMedico() {
+    var nombre = $("#e-nombre").value.trim();
+    if (!nombre) { toast("Falta el nombre del médico."); $("#e-nombre").focus(); return; }
+    var dia = $("#e-cdia").value, mes = $("#e-cmes").value;
+    if ((dia && !mes) || (mes && !dia)) { toast("Completá día y mes del cumpleaños, o dejá los dos vacíos."); return; }
+    var m = editando ? buscar(editando) : { id: uid(), notas: [] };
+    ["nombre", "especialidad", "matricula", "direccion", "ciudad", "horarios", "telefono", "email", "comentario"].forEach(function (k) { m[k] = $("#e-" + k).value.trim(); });
+    m.cumple = dia && mes ? mes + "-" + dia : "";
+    if (!editando) db.medicos.push(m);
+    guardar();
+    var nuevo = !editando;
+    cerrar();
+    if (nuevo) { actual = m.id; composer.tipo = "visita"; renderDetalle(); setTimeout(function () { abrir("detalle"); }, 30); }
+    else renderDetalle();
+    toast(nuevo ? "Médico agregado" : "Cambios guardados");
+  }
+
+  /* ---------- respaldo ---------- */
+  function renderAjustes() {
+    var nEj = db.medicos.filter(function (m) { return m.ejemplo; }).length;
+    $("#ajustes").innerHTML =
+      '<div class="bar"><div class="wrap"><button class="btn ghost" type="button" data-act="cerrar">← Médicos</button><span></span></div></div>' +
+      '<div class="wrap sheet-body">' +
+        '<h2 class="det-name" style="margin:0">Respaldo y carga</h2>' +
+        '<p class="hint">Tus datos se guardan solo en este teléfono, dentro del navegador. Si borrás los datos del navegador o cambiás de celular, se pierden. Hacé un respaldo cada tanto y mandátelo por WhatsApp o mail.</p>' +
+        '<div class="block"><h3>Guardar una copia</h3>' +
+          '<div class="actions"><button class="btn primary" type="button" data-act="exp-json">Descargar respaldo</button><button class="btn" type="button" data-act="exp-csv">Descargar para Excel</button><button class="btn" type="button" data-act="copiar">Copiar respaldo</button></div>' +
+          '<p class="hint">Si la descarga no arranca, usá <b>Copiar respaldo</b> y pegalo en un chat o mail a vos mismo.</p>' +
+          '<textarea id="copia" readonly hidden></textarea>' +
+        "</div>" +
+        '<div class="block"><h3>Cargar médicos o un respaldo</h3>' +
+          '<div class="field"><label for="archivo">Elegí un archivo de respaldo (.json) o una planilla de Excel guardada como CSV</label><input type="file" id="archivo" accept=".json,.csv,.txt,application/json,text/csv"></div>' +
+          '<div class="field"><label for="pegado">O pegá acá el texto del respaldo o las filas copiadas de Excel</label><textarea id="pegado" placeholder="Pegá acá…"></textarea></div>' +
+          '<div class="actions"><button class="btn" type="button" data-act="importar-texto">Cargar lo pegado</button></div>' +
+          '<p class="hint">Para la planilla, la primera fila tiene que tener los títulos. Sirven estos: <code>nombre</code> <code>especialidad</code> <code>matricula</code> <code>telefono</code> <code>email</code> <code>direccion</code> <code>ciudad</code> <code>horarios</code> <code>cumpleaños</code> (día/mes) <code>comentario</code>. Si un médico ya existe con la misma matrícula, se actualizan sus datos y se conservan sus notas.</p>' +
+        "</div>" +
+        '<div class="block"><h3>Borrar</h3><div class="actions">' +
+          (nEj ? '<button class="btn" type="button" data-act="borrar-ejemplos">Borrar los ' + nEj + " ejemplos</button>" : "") +
+          '<button class="btn danger" type="button" data-act="borrar-todo">Borrar todos los datos</button></div>' +
+          '<p class="hint">Los botones de borrar piden un segundo toque para confirmar.</p></div>' +
+      "</div>";
+  }
+  function respaldoJSON() { return JSON.stringify({ app: "agenda-medicos", version: 1, exportado: new Date().toISOString(), medicos: db.medicos }, null, 1); }
+  function csvCell(v) { v = String(v == null ? "" : v); return /[";\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function respaldoCSV() {
+    var cab = ["nombre", "especialidad", "matricula", "telefono", "email", "direccion", "ciudad", "horarios", "cumpleaños", "comentario", "ultima visita", "pendientes"];
+    var filas = db.medicos.map(function (m) {
+      var c = m.cumple ? m.cumple.split("-") : null, u = ultimaVisita(m);
+      return [m.nombre, m.especialidad, m.matricula, m.telefono, m.email, m.direccion, m.ciudad, m.horarios, c ? c[1] + "/" + c[0] : "", m.comentario, u ? u.split("-").reverse().join("/") : "",
+        pendientes(m).map(function (n) { return n.texto; }).join(" | ")].map(csvCell).join(";");
+    });
+    return "﻿" + cab.join(";") + "\r\n" + filas.join("\r\n");
+  }
+  function descargar(nombre, texto, tipo) {
+    try {
+      var url = URL.createObjectURL(new Blob([texto], { type: tipo }));
+      var a = document.createElement("a"); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      toast("Descargando " + nombre);
+    } catch (e) { toast("No se pudo descargar. Usá Copiar respaldo."); }
+  }
+
+  function parseCSV(txt) {
+    txt = txt.replace(/^﻿/, "");
+    var primera = txt.split(/\r?\n/)[0] || "";
+    var sep = (primera.match(/\t/g) || []).length ? "\t" : (primera.match(/;/g) || []).length >= (primera.match(/,/g) || []).length ? ";" : ",";
+    var filas = [], fila = [], cel = "", comillas = false;
+    for (var i = 0; i < txt.length; i++) {
+      var ch = txt[i];
+      if (comillas) {
+        if (ch === '"') { if (txt[i + 1] === '"') { cel += '"'; i++; } else comillas = false; }
+        else cel += ch;
+      } else if (ch === '"') comillas = true;
+      else if (ch === sep) { fila.push(cel); cel = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && txt[i + 1] === "\n") i++; fila.push(cel); filas.push(fila); fila = []; cel = ""; }
+      else cel += ch;
+    }
+    if (cel || fila.length) { fila.push(cel); filas.push(fila); }
+    return filas.filter(function (f) { return f.some(function (c) { return c.trim(); }); });
+  }
+  var ALIAS = {
+    nombre: ["nombre", "nombre completo", "medico", "apellido y nombre", "nombre y apellido", "doctor"],
+    especialidad: ["especialidad"], matricula: ["matricula", "mp", "mn", "nro matricula"], telefono: ["telefono", "tel", "celular", "cel"],
+    email: ["email", "mail", "correo", "e-mail"], direccion: ["direccion", "domicilio", "consultorio", "calle"], ciudad: ["ciudad", "localidad", "zona"],
+    horarios: ["horarios", "horario", "dias y horarios", "dias", "atiende"], cumple: ["cumpleanos", "cumple", "nacimiento", "fecha de nacimiento"],
+    comentario: ["comentario", "comentarios", "observaciones", "notas"]
+  };
+  function parseCumple(v) {
+    v = String(v || "").trim(); var p;
+    if ((p = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return pad(+p[2]) + "-" + pad(+p[3]);
+    if ((p = v.match(/^(\d{1,2})[\/\-.](\d{1,2})/))) { if (+p[2] >= 1 && +p[2] <= 12 && +p[1] >= 1 && +p[1] <= 31) return pad(+p[2]) + "-" + pad(+p[1]); }
+    return "";
+  }
+  function importarCSV(txt) {
+    var filas = parseCSV(txt); if (filas.length < 2) throw new Error("La planilla necesita una fila de títulos y al menos un médico.");
+    var cab = filas[0].map(function (h) { return norm(h).replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim(); }), idx = {};
+    Object.keys(ALIAS).forEach(function (k) { for (var i = 0; i < cab.length; i++) if (ALIAS[k].indexOf(cab[i]) >= 0) { idx[k] = i; break; } });
+    if (idx.nombre == null) throw new Error("No encontré la columna “nombre” en la primera fila.");
+    var nuevos = 0, act = 0;
+    filas.slice(1).forEach(function (f) {
+      var d = {}; Object.keys(idx).forEach(function (k) { d[k] = (f[idx[k]] || "").trim(); });
+      if (!d.nombre) return;
+      if (d.cumple != null) d.cumple = parseCumple(d.cumple);
+      var ex = d.matricula ? db.medicos.filter(function (m) { return norm(m.matricula) === norm(d.matricula); })[0] : null;
+      if (ex) { Object.keys(d).forEach(function (k) { if (d[k]) ex[k] = d[k]; }); delete ex.ejemplo; act++; }
+      else { var m = { id: uid(), notas: [] }; CAMPOS.forEach(function (k) { m[k] = d[k] || ""; }); db.medicos.push(m); nuevos++; }
+    });
+    return nuevos + " médicos nuevos" + (act ? " y " + act + " actualizados" : "");
+  }
+  function importarJSON(txt) {
+    var data = JSON.parse(txt), lista = Array.isArray(data) ? data : data.medicos;
+    if (!Array.isArray(lista)) throw new Error("Ese archivo no parece un respaldo de esta agenda.");
+    var nuevos = 0, act = 0;
+    lista.forEach(function (m) {
+      if (!m || !m.nombre) return;
+      m.id = m.id || uid(); m.notas = Array.isArray(m.notas) ? m.notas : [];
+      for (var i = 0; i < db.medicos.length; i++) if (db.medicos[i].id === m.id) { db.medicos[i] = m; act++; return; }
+      db.medicos.push(m); nuevos++;
+    });
+    return nuevos + " médicos nuevos" + (act ? " y " + act + " actualizados" : "");
+  }
+  function importar(txt) {
+    txt = String(txt || "").trim(); if (!txt) { toast("No hay nada para cargar."); return; }
+    try {
+      var r = /^[\[{]/.test(txt) ? importarJSON(txt) : importarCSV(txt);
+      guardar(); renderAjustes(); toast("Listo: " + r);
+    } catch (e) { toast(e instanceof SyntaxError ? "El respaldo está incompleto o dañado." : e.message); }
+  }
+
+  /* ---------- confirmación de dos toques ---------- */
+  function armado(btn, texto) {
+    if (btn.dataset.armed === "1") return true;
+    var orig = btn.textContent; btn.dataset.armed = "1"; btn.textContent = texto || "Tocá de nuevo para confirmar";
+    setTimeout(function () { if (btn.isConnected) { btn.dataset.armed = ""; btn.textContent = orig; } }, 3500);
+    return false;
+  }
+
+  var tTimer;
+  function toast(t) { var el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(tTimer); tTimer = setTimeout(function () { el.hidden = true; }, 2600); }
+
+  /* ---------- eventos ---------- */
+  $("#q").addEventListener("input", function (e) { st.q = e.target.value; renderLista(); });
+  $("#f-esp").addEventListener("change", function (e) { st.esp = e.target.value; renderLista(); });
+  $("#f-ciudad").addEventListener("change", function (e) { st.ciudad = e.target.value; renderLista(); });
+  $("#orden").addEventListener("change", function (e) { st.orden = e.target.value; try { localStorage.setItem(KEY + ":orden", st.orden); } catch (x) {} renderLista(); });
+
+  document.addEventListener("submit", function (e) { e.preventDefault(); if (e.target.id === "form-medico") guardarMedico(); });
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.dataset && t.dataset.hecho) { var m = buscar(actual); (m.notas || []).forEach(function (n) { if (n.id === t.dataset.hecho) n.hecho = true; }); guardar(); setTimeout(renderDetalle, 250); toast("Pendiente resuelto"); }
+    if (t.id === "archivo" && t.files && t.files[0]) {
+      var fr = new FileReader(); fr.onload = function () { importar(fr.result); }; fr.onerror = function () { toast("No se pudo leer el archivo."); };
+      fr.readAsText(t.files[0]);
+    }
+  });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    var d = b.dataset;
+    if (d.open) { actual = d.open; composer.tipo = "visita"; renderDetalle(); abrir("detalle"); return; }
+    if (d.flag) { st.flag = st.flag === d.flag ? "" : d.flag; renderLista(); return; }
+    if (d.tipo) { composer.tipo = d.tipo; var txt = $("#c-texto").value; renderDetalle(); $("#c-texto").value = txt; return; }
+    if (d.toggle) { var m1 = buscar(actual); m1.notas.forEach(function (n) { if (n.id === d.toggle) n.hecho = !n.hecho; }); guardar(); renderDetalle(); return; }
+    if (d.borrarNota) { if (!armado(b, "¿borrar?")) return; var m2 = buscar(actual); m2.notas = m2.notas.filter(function (n) { return n.id !== d.borrarNota; }); guardar(); renderDetalle(); toast("Anotación borrada"); return; }
+    switch (d.act) {
+      case "cerrar": cerrar(); break;
+      case "nuevo": editando = null; renderEditor(); abrir("editor"); setTimeout(function () { var n = $("#e-nombre"); if (n) n.focus(); }, 60); break;
+      case "editar": editando = actual; renderEditor(); abrir("editor"); break;
+      case "guardar-medico": guardarMedico(); break;
+      case "anotar": anotar(); break;
+      case "borrar-medico":
+        if (!armado(b, "Tocá de nuevo para borrar")) return;
+        db.medicos = db.medicos.filter(function (m) { return m.id !== editando; }); guardar();
+        pila = pila.filter(function (p) { return p !== "detalle"; }); $("#detalle").hidden = true;
+        cerrar(); toast("Médico borrado"); break;
+      case "respaldo": renderAjustes(); abrir("ajustes"); break;
+      case "exp-json": descargar("agenda-medicos-" + hoyISO() + ".json", respaldoJSON(), "application/json"); break;
+      case "exp-csv": descargar("agenda-medicos-" + hoyISO() + ".csv", respaldoCSV(), "text/csv;charset=utf-8"); break;
+      case "copiar":
+        var ta = $("#copia"), txt2 = respaldoJSON(); ta.value = txt2; ta.hidden = false;
+        try { navigator.clipboard.writeText(txt2).then(function () { toast("Respaldo copiado. Pegalo en un chat o mail."); }, function () { ta.select(); toast("Seleccioná el texto de abajo y copialo."); }); }
+        catch (x) { ta.select(); toast("Seleccioná el texto de abajo y copialo."); }
+        break;
+      case "importar-texto": importar($("#pegado").value); break;
+      case "borrar-ejemplos":
+        if (!armado(b, "Tocá de nuevo para borrarlos")) return;
+        db.medicos = db.medicos.filter(function (m) { return !m.ejemplo; }); guardar();
+        if (pila.length) renderAjustes(); renderLista(); toast("Ejemplos borrados"); break;
+      case "borrar-todo":
+        if (!armado(b, "Se borra todo. Tocá de nuevo")) return;
+        db.medicos = []; guardar(); renderAjustes(); renderLista(); toast("Agenda vacía"); break;
+    }
+  });
+
+  renderLista();
+
+  // Funciona sin internet cuando está instalada como app (no aplica dentro de la vista previa).
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  }
+})();
+</script>
+</body>
+</html>
