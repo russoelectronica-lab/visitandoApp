@@ -677,9 +677,6 @@ code { font-family: var(--f-mono); font-size: 0.82rem; background: var(--soft); 
 
   renderLista();
 
-  // Funciona sin internet cuando está instalada como app (no aplica dentro de la vista previa).
-    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
-  }
 })();
 </script>
 </body>
